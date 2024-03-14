@@ -2,21 +2,22 @@ const mysql = require('mysql');
 const express = require('express');
 const bodyParser = require('body-parser');
 
-// const pool = mysql.createPool({
-//     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
-//     user: "fine_m_admin",
-//     password: "fineSYSmm123",
-//     database: "fine-management"
-// });
+const pool = mysql.createPool({
+    host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
+    user: "fine_m_admin",
+    password: "fineSYSmm123",
+    database: "fine-management",
+    port: "8081"
+});
 
-// pool.getConnection((err, connection) => {
-//     if (err) {
-//         console.error('Error connecting to database:', err);
-//     } else {
-//         console.log('Connected to database successfully');
-//         connection.release(); // release the connection
-//     }
-// });
+pool.getConnection((err, connection) => {
+    if (err) {
+        console.error('Error connecting to database:', err);
+    } else {
+        console.log('Connected to database successfully');
+        connection.release(); // release the connection
+    }
+});
 
 const app = express();
 app.use(bodyParser.json());
@@ -54,27 +55,30 @@ app.get('/api/test', (req,res) => {
         host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
         user: "fine_m_admin",
         password: "fineSYSmm123",
-        database: "fine-management"
+        database: "fine-management",
+        port: "8081"
     })
 
-    const sql = "SELECT * FROM testtable"
+    const sql = "SELECT * FROM police"
 
     const handleQueryError = (error) => {
         console.error('An error occurred while executing the query:', error);
         res.status(500).json({ error: 'An error occurred while executing the query' });
     };
 
-    db.query(sql, (err, data) => {
+
+    pool.query(sql, (err, data) => {
         if (err) {
             console.log(err)
+            db.end()
             return res.json('Error')
         } 
         if (data.length > 0) {
             console.log(data)
+            db.end()
             return res.json(data)
         }
     })
 
     db.on('error', handleQueryError);
-    db.end()
 })
