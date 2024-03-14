@@ -22,6 +22,7 @@ pool.getConnection((err, connection) => {
 const app = express();
 app.use(bodyParser.json());
 
+// Add Police to System
 app.post('/api/police', (req, res) => {
     const {national_id, id, name, address, phone_number, email, password, confirm_password} = req.body;
 
@@ -57,6 +58,43 @@ app.post('/api/police', (req, res) => {
     });
 });
 
+
+// Add Driver to System
+app.post('/api/driver', (req, res) => {
+    const {nic, id, name, address, phone_number, email, password, confirm_password} = req.body;
+
+    if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
+        return res.status(400).send('Please enter all required fields');
+    }
+
+    if(password !== confirm_password) {
+        return res.status(400).send('Password do not match');
+    }
+
+    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+    const values1 = [email, password, 'driver'];
+
+    pool.query(sql1, values1, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+
+        const user_id = result.insertId;
+
+        const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [nic, id, name, address, phone_number, email, password, user_id];
+    
+        pool.query(sql, values, (err, result) => {
+            if(err) {
+                console.log(err);
+                return res.status(500).json({message: 'Internal server error'});
+            }
+            return res.status(200).json({message: 'Driver added successfully'});
+        });
+    });
+});
+
 const port = 3000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
@@ -79,6 +117,5 @@ app.post('/api/auth/login', (req,res) => {
                 return res.json("logged")
             }
         }
-    })
-
-})
+    });
+});
