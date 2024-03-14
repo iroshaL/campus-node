@@ -50,35 +50,23 @@ app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
 
-app.get('/api/test', (req,res) => {
-    const db = mysql.createConnection({
-        host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
-        user: "fine_m_admin",
-        password: "fineSYSmm123",
-        database: "fine-management",
-        port: "8081"
-    })
+// login
+app.post('/api/auth/login', (req,res) => {
 
-    const sql = "SELECT * FROM police"
+    const sql = "SELECT * FROM users WHERE email = ?"
 
-    const handleQueryError = (error) => {
-        console.error('An error occurred while executing the query:', error);
-        res.status(500).json({ error: 'An error occurred while executing the query' });
-    };
-
-
-    pool.query(sql, (err, data) => {
+    pool.query(sql, [req.body.email], (err, data) => {
         if (err) {
             console.log(err)
-            db.end()
             return res.json('Error')
         } 
         if (data.length > 0) {
             console.log(data)
-            db.end()
-            return res.json(data)
+            if (req.body.password == data[0].password) {
+                console.log('logged in')
+                return res.json("logged")
+            }
         }
     })
 
-    db.on('error', handleQueryError);
 })
