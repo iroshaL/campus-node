@@ -33,15 +33,27 @@ app.post('/api/police', (req, res) => {
         return res.status(400).send('Password do not match');
     }
 
-    const sql = 'INSERT INTO police (national_id, id, name, address, phone_number, email, password) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    const values = [national_id, id, name, address, phone_number, email, password];
+    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+    const values1 = [email, password, 'police'];
 
-    pool.query(sql, values, (err, result) => {
+    pool.query(sql1, values1, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
-        return res.status(200).json({message: 'Police added successfully'});
+
+        const user_id = result.insertId;
+
+        const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+        const values = [national_id, id, name, address, phone_number, email, password, user_id];
+    
+        pool.query(sql, values, (err, result) => {
+            if(err) {
+                console.log(err);
+                return res.status(500).json({message: 'Internal server error'});
+            }
+            return res.status(200).json({message: 'Police added successfully'});
+        });
     });
 });
 
