@@ -71,6 +71,37 @@ cron.schedule('0 0 * * *',() => {
     });
 });
 
+
+// Delete Notification According to Specific Driver
+app.delete('/api/notification/delete/:id', (req, res) => {
+    const sql = "DELETE FROM notification WHERE n_id = ?"
+    const values = [req.params.id]
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json({message: 'Notification deleted successfully'});
+    });
+});
+
+
+// Get Notification According to Driver ID
+app.get('/api/notification/get/:id', (req, res) => {
+    const sql = "SELECT * FROM notification WHERE d_id = ?"
+    const values = [req.params.id]
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
 // Add Police to System
 app.post('/api/police', (req, res) => {
     const {national_id, id, name, address, phone_number, email, password, confirm_password} = req.body;
