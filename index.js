@@ -95,6 +95,66 @@ app.post('/api/driver', (req, res) => {
     });
 });
 
+
+// Get Specific Police by ID
+app.get('/api/police/:id', (req, res) => {
+    const sql = "SELECT * FROM police WHERE p_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
+// Get Specific Driver by ID
+app.get('/apu/driver/:id', (req, res) => {
+    const sql = "SELECT * FROM driver WHERE d_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
+// Get Issued Fines by Driver ID
+app.get('/api/fines/:id', (req, res) => {
+    const sql = 'SELECT * FROM issued_fines WHERE d_id = ?';
+    pool.query(sql, [req.params.id], (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
+// Add Invoice - Under Development
+app.post('/api/invoice/add', (req, res) => {
+    const {p_id, r_id, date_time, if_id} = req.body;
+    sql = "INSERT INTO invoice (p_id, r_id, date_time, if_id) VALUES (?, ?, ?, ?)";
+    values = [p_id, r_id, date_time, if_id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json({message: 'Invoice added successfully', result});
+    });
+});
+
+
 const port = 3000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
@@ -107,14 +167,14 @@ app.post('/api/auth/login', (req,res) => {
 
     pool.query(sql, [req.body.email], (err, data) => {
         if (err) {
-            console.log(err)
-            return res.json('Error')
+            console.log(err);
+            return res.json('Error');
         } 
         if (data.length > 0) {
             console.log(data)
             if (req.body.password == data[0].password) {
-                console.log('logged in')
-                return res.json("logged")
+                console.log('logged in');
+                return res.json("logged");
             }
         }
     });
