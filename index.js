@@ -1,6 +1,7 @@
 const mysql = require('mysql');
 const express = require('express');
 const bodyParser = require('body-parser');
+const cron = require('node-cron');
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -21,6 +22,54 @@ pool.getConnection((err, connection) => {
 
 const app = express();
 app.use(bodyParser.json());
+
+// Notification System
+cron.schedule('0 0 * * *',() => {
+    const currentDate = new Date();
+    const midnight = new Date(currentDate);
+    midnight.setHours(0,0,0,0);
+
+    const elevenDaysAgo = new Date(midnight);
+    elevenDaysAgo.setDate(elevenDaysAgo.getDate() + 11);
+
+    const formattedDate = elevenDaysAgo.toISOString().split('T')[0];
+    console.log(formattedDate);
+
+    const sql = "SELECT * FROM issued_fines WHERE date < ? AND fine_status = 'pending'";
+    const values = [formattedDate];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log('Error  executing query: ', err);
+            return;
+        }
+
+        result.forEach(fine => {
+            const FineRuleName = "SELECT name FROM rules WHERE r_id=?";
+            const FineRuleValues = [fine.r_id];
+
+            pool.query(FineRuleName, FineRuleValues, (err, rule) => {
+                if (err) {
+                    console.log('Error  executing query: ', err);
+                    return;
+                }
+                let message = rule[0].name;
+
+                const NotificationSQL = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, ?)";
+                const NotificationValues = ['Fine is Overdue. You must pay quickly for '+message, fine.d_id];
+    
+                pool.query(NotificationSQL, NotificationValues, (err, result) => {
+                    if (err) {
+                        console.log('Error  executing query: ', err);
+                        return;
+                    }
+    
+                    console.log('Notification sent');
+                });
+            });
+        });
+    });
+});
 
 // Add Police to System
 app.post('/api/police', (req, res) => {
@@ -221,18 +270,18 @@ app.get('/api/getdriver', (req, res) => {
 //issue fine
 app.post('/api/issuefine', (req, res) => {
 
-    const sql = "INSERT INTO issued_fines (d_id,r_id,p_id,fine_status) VALUES (?)"
-    const values = [req.body.d_id, req.body.r_id, req.body.p_id, "pending"]
+    const sql = "INSERT INTO issued_fines (d_id, r_id, p_id, fine_status, date) VALUES (?, ?, ?, ?, CURDATE())";
+    const values = [req.body.d_id, req.body.r_id, req.body.p_id, "pending"];
 
-    pool.query(sql, [values], (err, data) => {
+    pool.query(sql, values, (err, data) => {
         if (err) {
             console.log(err)
             return res.json('err')
         } else {
             return res.json('success')
         }
-    })
-})
+    });
+});
 
 // get all fines
 app.get('/api/getfine', (req, res) => {
@@ -247,5 +296,5 @@ app.get('/api/getfine', (req, res) => {
             console.log(data)
             return res.json(data)
         }
-    })
-})
+    });
+});
