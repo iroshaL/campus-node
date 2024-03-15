@@ -82,6 +82,17 @@ app.post('/api/driver', (req, res) => {
 
         const user_id = result.insertId;
 
+        // qr gen
+        const QRCode = require('qrcode');
+    
+        QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
+          errorCorrectionLevel: 'H'
+        }, function(err) {
+          if (err) throw err;
+          console.log('QR code saved!');
+          return res.json('success')
+        });
+
         const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
         const values = [nic, id, name, address, phone_number, email, password, user_id];
     
@@ -188,4 +199,19 @@ app.get('/api/getfine', (req, res) => {
             return res.json(data)
         }
     })
+})
+
+//generate qr code
+app.post('/api/qr', (req, res) => {
+    const QRCode = require('qrcode');
+
+    const id = req.body.id
+
+    QRCode.toFile(`./qr/${id}.png`, toString(id), {
+      errorCorrectionLevel: 'H'
+    }, function(err) {
+      if (err) throw err;
+      console.log('QR code saved!');
+      return res.json('success')
+    });
 })
