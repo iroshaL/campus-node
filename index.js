@@ -56,10 +56,12 @@ app.post('/api/auth/login', (req,res) => {
     const sql = "SELECT * FROM users WHERE email = ?"
 
     pool.query(sql, [req.body.email], (err, data) => {
+        
         if (err) {
             console.log(err)
             return res.json('Error')
         } 
+
         if (data.length > 0) {
             console.log(data)
             if (req.body.password == data[0].password) {
