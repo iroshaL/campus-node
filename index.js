@@ -121,3 +121,71 @@ app.post('/api/auth/login', (req,res) => {
         }
     });
 });
+
+// get rules for police
+app.get('/api/rules', (req, res) => {
+
+    const sql = "SELECT * FROM rules"
+
+    pool.query(sql, (err, data) => {
+        if(err) {
+            console.log(err)
+            return res.json('err')
+        }
+
+        if (data.length > 0) {
+            console.log(data)
+            return res.json(data)
+        }
+    })
+})
+
+// get driver details 
+app.get('/api/getdriver', (req, res) => {
+
+    const sql = "SELECT * FROM driver WHERE d_id = ?"
+
+    pool.query(sql, [req.body.id], (err, data) => {
+        if(err) {
+            console.log(err)
+            return res.json('err')
+        }
+
+        if (data.length > 0) {
+            console.log(data)
+            return res.json(data)
+        }
+    })
+})
+
+//issue fine
+app.post('/api/issuefine', (req, res) => {
+
+    const sql = "INSERT INTO issued_fines (d_id,r_id,p_id,fine_status) VALUES (?)"
+    const values = [req.body.d_id, req.body.r_id, req.body.p_id, "pending"]
+
+    pool.query(sql, [values], (err, data) => {
+        if (err) {
+            console.log(err)
+            return res.json('err')
+        } else {
+            return res.json('success')
+        }
+    })
+})
+
+// get all fines
+app.get('/api/getfine', (req, res) => {
+
+    const sql = "SELECT * FROM issued_fines"
+
+    pool.query(sql, (err, data) => {
+        if(err) {
+            console.log(err)
+            return res.json('err')
+        } else {
+            console.log(data)
+            return res.json(data)
+        }
+    })
+})
