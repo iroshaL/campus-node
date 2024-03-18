@@ -30,7 +30,7 @@ cron.schedule('0 0 * * *',() => {
     midnight.setHours(0,0,0,0);
 
     const elevenDaysAgo = new Date(midnight);
-    elevenDaysAgo.setDate(elevenDaysAgo.getDate() + 11);
+    elevenDaysAgo.setDate(elevenDaysAgo.getDate() - 11);
 
     const formattedDate = elevenDaysAgo.toISOString().split('T')[0];
     console.log(formattedDate);
