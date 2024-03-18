@@ -2,6 +2,7 @@ const mysql = require('mysql');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
+const { createTransport } = require("nodemailer");
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -341,17 +342,102 @@ app.get('/api/getfine', (req, res) => {
     })
 })
 
-//generate qr code
-app.post('/api/qr', (req, res) => {
-    const QRCode = require('qrcode');
+// //generate qr code
+// app.post('/api/qr', (req, res) => {
+//     const QRCode = require('qrcode');
 
-    const id = req.body.id
+//     const id = req.body.id
 
-    QRCode.toFile(`./qr/${id}.png`, toString(id), {
-      errorCorrectionLevel: 'H'
-    }, function(err) {
-      if (err) throw err;
-      console.log('QR code saved!');
-      return res.json('success')
-    });
+//     QRCode.toFile(`./qr/${id}.png`, toString(id), {
+//       errorCorrectionLevel: 'H'
+//     }, function(err) {
+//       if (err) throw err;
+//       console.log('QR code saved!');
+//       return res.json('success')
+//     });
+// })
+
+
+// password reset
+app.post('/api/resetpassword', (req, res) => {
+    
+    const sql = "UPDATE users SET password = ? WHERE user_id = ?"
+
+    pool.query(sql, [req.body.pass], [req.body.id], (err, data) => {
+        if (err) {
+            console.log(err)
+            return res.json('error')
+        } else {
+            console.log('password changes')
+            return res.json('success')
+        }
+    })
+})
+
+// otp
+app.post('/api/otp', (req, res) => {
+
+    const generateOTP = () => {
+        return Math.floor(1000 + Math.random() * 9000); // Generates a random 4-digit OTP
+      };
+    
+      const otp = generateOTP();
+      console.log(otp);
+    
+      const userEmail = req.body.userEmail; // Assuming the email is sent in the request body
+    
+      const mailServer = createTransport({
+        service: "gmail",
+        auth: {
+          user: "nskppoliceapp@gmail.com",
+          pass: "cexp ixhu nlxd rlbp",
+        },
+      });
+    
+      console.log("Start sending email");
+    
+      mailServer.sendMail(
+        {
+          from: "NSKP POLICE APP <nskppoliceapp@gmail.com>",
+          to: userEmail,
+          subject: "OTP NSKP App",
+          text: `Hello, Your OTP is: ${otp}`, // Use backticks for template string
+        },
+        async (err, info) => {
+          if (err) {
+            console.error("Can't send email:", err);
+            res.status(500).json({ error: "Can't send email" }); // Send error response to the client
+          } else {
+            console.log("Email sent");
+            try {
+              // Save OTP to the user in the database
+            //   const user = await User.findOneAndUpdate(
+            //     { email: userEmail },
+            //     { otp: otp }
+            //   );
+
+                const sql = `UPDATE users SET otp = ${otp} WHERE email = "${req.body.userEmail}"`
+
+                pool.query(sql, (err, data) => {
+                    if (err) {
+                        console.log(err)
+                        // return res.json('error')
+                    } else {
+                        console.log('password changes')
+                        // return res.json('success')
+                    }
+                })
+
+                // console.log("OTP saved to user:", user);
+            } catch (error) {
+              console.error("Error saving OTP to user:", error);
+              res.status(500).json({ error: "Error saving OTP to user" }); // Send error response to the client
+              return;
+            }
+            res.status(200).json({ message: "Email sent successfully" }); // Send success response to the client
+          }
+        }
+      );
+    
+      console.log("Email sending process initiated");
 })
