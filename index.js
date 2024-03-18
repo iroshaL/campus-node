@@ -31,7 +31,7 @@ cron.schedule('0 0 * * *',() => {
     midnight.setHours(0,0,0,0);
 
     const elevenDaysAgo = new Date(midnight);
-    elevenDaysAgo.setDate(elevenDaysAgo.getDate() + 11);
+    elevenDaysAgo.setDate(elevenDaysAgo.getDate() - 11);
 
     const formattedDate = elevenDaysAgo.toISOString().split('T')[0];
     console.log(formattedDate);
@@ -167,25 +167,28 @@ app.post('/api/driver', (req, res) => {
         const QRCode = require('qrcode');
     
         QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
-          errorCorrectionLevel: 'H'
+            errorCorrectionLevel: 'H'
         }, function(err) {
-          if (err) throw err;
-          console.log('QR code saved!');
-          return res.json('success')
-        });
-
-        const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [nic, id, name, address, phone_number, email, password, user_id];
-    
-        pool.query(sql, values, (err, result) => {
-            if(err) {
+            if (err) {
                 console.log(err);
                 return res.status(500).json({message: 'Internal server error'});
             }
-            return res.status(200).json({message: 'Driver added successfully'});
+            console.log('QR code saved!');
+
+            const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+            const values = [nic, id, name, address, phone_number, email, password, user_id];
+        
+            pool.query(sql, values, (err, result) => {
+                if(err) {
+                    console.log(err);
+                    return res.status(500).json({message: 'Internal server error'});
+                }
+                return res.status(200).json({message: 'Driver added successfully'});
+            });
         });
     });
 });
+
 
 
 // Get Specific Police by ID
