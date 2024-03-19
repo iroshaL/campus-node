@@ -518,3 +518,20 @@ app.post('/api/upload' , async (req, res) => {
     fs.writeFileSync(req.body.name, realfile, "utf8")
 
 })
+
+
+// invoice 
+app.post('/api/invoice', (req, res) => {
+
+    const sql = `INSERT INTO invoice (p_id, r_id, date_time, if_id) VALUES(${req.body.p_id}, ${req.body.r_id}, CURRENT_TIMESTAMP(), ${req.body.if_id})`
+
+    pool.query(sql, (err, data) => {
+        if(err) {
+            console.log(err)
+            return res.json("error")
+        } else {
+            console.log('invoice sent to database')
+            return res.json('success')
+        }
+    })
+})
