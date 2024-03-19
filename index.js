@@ -74,6 +74,47 @@ cron.schedule('0 0 * * *',() => {
 });
 
 
+// Delayed Fines Double System
+cron.schedule('01 14 * * *', () => {
+    const currentDate = new Date();
+    const midnight = new Date(currentDate);
+    midnight.setHours(0,0,0,0);
+
+    const fourteenDaysAgo = new Date(midnight);
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+    const formattedDate = fourteenDaysAgo.toISOString().split('T')[0];
+    console.log(formattedDate);
+
+    const sql = "SELECT * FROM issued_fines WHERE date < ? AND fine_status = 'pending' AND payment_doubled = 'no'";
+    const values = [formattedDate];
+
+    pool.query(sql, values, (err, result) => {
+        if (err) {
+            console.log('Error  executing query: ', err);
+            return;
+        }
+
+        console.log(result);
+        result.forEach(issuedFine => {
+            // Double Fine and Update Payment Doubled to 'yes'
+            const doubleFine = issuedFine.price * 2;
+            const updatedTable = "UPDATE issued_fines SET price = ?, payment_doubled = 'yes' WHERE if_id = ?";
+            const updatedValues = [doubleFine, issuedFine.if_id];
+
+            pool.query(updatedTable, updatedValues, (err, result) => {
+                if (err) {
+                    console.log('Error  executing query: ', err);
+                    return;
+                }
+
+                console.log('Fine Doubled and Payment Doubled Updated')  
+            });
+        });
+    });
+});
+
+
 // Delete Notification According to Specific Driver
 app.delete('/api/notification/delete/:id', (req, res) => {
     const sql = "DELETE FROM notification WHERE n_id = ?"
@@ -251,6 +292,28 @@ app.post('/api/invoice/add', (req, res) => {
 });
 
 
+// Issue Fine
+app.post('/api/issueFine', (req, res) => {
+    const { policeId, ruleId, driverId, finePrice } = req.body;
+
+    if(!policeId, !ruleId, !driverId, !finePrice) {
+        return res.status(400).json({message: 'Please enter all required fields'});
+    }
+
+    const sql = "INSERT INTO issued_fines (d_id, r_id, p_id, price, fine_status, date, payment_doubled) VALUES (?,?,?,?,?,?,?)";
+    const currentDate = new Date().toISOString().split('T')[0];
+    const values = [driverId, ruleId, policeId, finePrice, 'pending', currentDate, 'no'];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json({message: 'Fine issued successfully'});
+    });
+});
+
+
 const port = 3000;
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
@@ -272,9 +335,10 @@ app.post('/api/auth/login', (req,res) => {
             console.log(data)
             if (req.body.password == data[0].password) {
                 console.log('logged in');
-                return res.json("logged");
+                return res.json(data);
             }
         }
+        return res.status(401).json({ message: 'Unauthorized' });
     });
 });
 
