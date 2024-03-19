@@ -541,5 +541,4 @@ app.post('/api/upload' , async (req, res) => {
 
     var realfile = Buffer.from(req.body.image, "base64")
     fs.writeFileSync(req.body.name, realfile, "utf8")
-
-})
+});
