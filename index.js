@@ -119,6 +119,7 @@ cron.schedule('0 0 * * *', () => {
 
 // Get Driver Details by ID
 app.get('/api/driver/:id', (req, res) => {
+    console.log(req.params.id);
     const sql = "SELECT * FROM driver WHERE user_id = ?";
     const values = [req.params.id];
 
