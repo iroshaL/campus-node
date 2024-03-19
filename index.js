@@ -117,6 +117,21 @@ cron.schedule('0 0 * * *', () => {
 });
 
 
+// Get Driver Details by ID
+app.get('/api/driver/:id', (req, res) => {
+    const sql = "SELECT * FROM driver WHERE user_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log('Error  executing query: ', err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
 // Delete Notification According to Specific Driver
 app.delete('/api/notification/delete/:id', (req, res) => {
     const sql = "DELETE FROM notification WHERE n_id = ?"
