@@ -1,5 +1,6 @@
 const mysql = require('mysql');
 const express = require('express');
+const fs = require('fs-extra')
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
 const { createTransport } = require("nodemailer");
@@ -296,11 +297,11 @@ app.get('/api/rules', (req, res) => {
 })
 
 // get driver details 
-app.get('/api/getdriver', (req, res) => {
+app.get('/api/getdriver/:id', (req, res) => {
 
     const sql = "SELECT * FROM driver WHERE d_id = ?"
 
-    pool.query(sql, [req.body.id], (err, data) => {
+    pool.query(sql, [req.params.id], (err, data) => {
         if(err) {
             console.log(err)
             return res.json('err')
@@ -443,4 +444,13 @@ app.post('/api/otp', (req, res) => {
       );
     
       console.log("Email sending process initiated");
+})
+
+
+// upload file
+app.post('/api/upload' , async (req, res) => {
+
+    var realfile = Buffer.from(req.body.image, "base64")
+    fs.writeFileSync(req.body.name, realfile, "utf8")
+
 })
