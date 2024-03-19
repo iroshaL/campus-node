@@ -4,6 +4,7 @@ const fs = require('fs-extra')
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
 const { createTransport } = require("nodemailer");
+const staticFilesDirectory = './qr';
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -24,6 +25,7 @@ pool.getConnection((err, connection) => {
 
 const app = express();
 app.use(bodyParser.json());
+app.use('/static', express.static(staticFilesDirectory));
 
 // Notification System
 cron.schedule('0 0 * * *',() => {
