@@ -75,7 +75,7 @@ cron.schedule('0 0 * * *',() => {
 
 
 // Delayed Fines Double System
-cron.schedule('01 14 * * *', () => {
+cron.schedule('0 0 * * *', () => {
     const currentDate = new Date();
     const midnight = new Date(currentDate);
     midnight.setHours(0,0,0,0);
