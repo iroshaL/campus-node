@@ -4,6 +4,7 @@ const fs = require('fs-extra')
 const bodyParser = require('body-parser');
 const cron = require('node-cron');
 const { createTransport } = require("nodemailer");
+const staticFilesDirectory = './qr';
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -24,6 +25,7 @@ pool.getConnection((err, connection) => {
 
 const app = express();
 app.use(bodyParser.json());
+app.use('/static', express.static(staticFilesDirectory));
 
 // Notification System
 cron.schedule('0 0 * * *',() => {
@@ -75,7 +77,7 @@ cron.schedule('0 0 * * *',() => {
 
 
 // Delayed Fines Double System
-cron.schedule('01 14 * * *', () => {
+cron.schedule('0 0 * * *', () => {
     const currentDate = new Date();
     const midnight = new Date(currentDate);
     midnight.setHours(0,0,0,0);
@@ -111,6 +113,21 @@ cron.schedule('01 14 * * *', () => {
                 console.log('Fine Doubled and Payment Doubled Updated')  
             });
         });
+    });
+});
+
+
+// Get Driver Details by ID
+app.get('/api/driver/:id', (req, res) => {
+    const sql = "SELECT * FROM driver WHERE user_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log('Error  executing query: ', err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
     });
 });
 
@@ -157,26 +174,38 @@ app.post('/api/police', (req, res) => {
         return res.status(400).send('Password do not match');
     }
 
-    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-    const values1 = [email, password, 'police'];
-
-    pool.query(sql1, values1, (err, result) => {
+    const idCheckSQL = "SELECT * FROM police WHERE p_id = ?";
+    pool.query(idCheckSQL, [id], (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
 
-        const user_id = result.insertId;
+        if(result.length > 0) {
+            return res.status(400).send('ID already exists');
+        }
 
-        const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-        const values = [national_id, id, name, address, phone_number, email, password, user_id];
+        const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+        const values1 = [email, password, 'police'];
     
-        pool.query(sql, values, (err, result) => {
+        pool.query(sql1, values1, (err, result) => {
             if(err) {
                 console.log(err);
                 return res.status(500).json({message: 'Internal server error'});
             }
-            return res.status(200).json({message: 'Police added successfully'});
+    
+            const user_id = result.insertId;
+    
+            const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+            const values = [national_id, id, name, address, phone_number, email, password, user_id];
+        
+            pool.query(sql, values, (err, result) => {
+                if(err) {
+                    console.log(err);
+                    return res.status(500).json({message: 'Internal server error'});
+                }
+                return res.status(200).json({message: 'Police added successfully'});
+            });
         });
     });
 });
@@ -186,6 +215,7 @@ app.post('/api/police', (req, res) => {
 app.post('/api/driver', (req, res) => {
     const {nic, id, name, address, phone_number, email, password, confirm_password} = req.body;
 
+    console.log(req.body);
     if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
         return res.status(400).send('Please enter all required fields');
     }
@@ -194,38 +224,50 @@ app.post('/api/driver', (req, res) => {
         return res.status(400).send('Password do not match');
     }
 
-    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-    const values1 = [email, password, 'driver'];
-
-    pool.query(sql1, values1, (err, result) => {
+    const idCheckSQL = "SELECT * FROM driver WHERE d_id = ?";
+    pool.query(idCheckSQL, [id], (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
 
-        const user_id = result.insertId;
+        if(result.length > 0) {
+            return res.status(400).send('ID already exists');
+        }
 
-        // qr gen
-        const QRCode = require('qrcode');
+        const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+        const values1 = [email, password, 'driver'];
     
-        QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
-            errorCorrectionLevel: 'H'
-        }, function(err) {
-            if (err) {
+        pool.query(sql1, values1, (err, result) => {
+            if(err) {
                 console.log(err);
                 return res.status(500).json({message: 'Internal server error'});
             }
-            console.log('QR code saved!');
-
-            const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-            const values = [nic, id, name, address, phone_number, email, password, user_id];
+    
+            const user_id = result.insertId;
+    
+            // qr gen
+            const QRCode = require('qrcode');
         
-            pool.query(sql, values, (err, result) => {
-                if(err) {
+            QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
+                errorCorrectionLevel: 'H'
+            }, function(err) {
+                if (err) {
                     console.log(err);
                     return res.status(500).json({message: 'Internal server error'});
                 }
-                return res.status(200).json({message: 'Driver added successfully'});
+                console.log('QR code saved!');
+    
+                const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+                const values = [nic, id, name, address, phone_number, email, password, user_id];
+            
+                pool.query(sql, values, (err, result) => {
+                    if(err) {
+                        console.log(err);
+                        return res.status(500).json({message: 'Internal server error'});
+                    }
+                    return res.status(200).json({message: 'Driver added successfully'});
+                });
             });
         });
     });
