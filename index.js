@@ -271,9 +271,10 @@ app.post('/api/auth/login', (req,res) => {
             console.log(data)
             if (req.body.password == data[0].password) {
                 console.log('logged in');
-                return res.json("logged");
+                return res.json(data);
             }
         }
+        return res.status(401).json({ message: 'Unauthorized' });
     });
 });
 
