@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const cron = require('node-cron');
 const { createTransport } = require("nodemailer");
 const staticFilesDirectory = './qr';
+const axios = require('axios');
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -380,6 +381,35 @@ app.post('/api/invoice/add', (req, res) => {
 });
 
 
+// Get Driver ID by User ID
+app.get('/api/driver/user/:id', (req, res) => {
+    const sql = "SELECT d_id FROM driver WHERE user_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+// Get Police ID by User ID
+app.get('/api/police/user/:id', (req, res) => {
+    const sql = "SELECT p_id FROM police WHERE user_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
 // Issue Fine
 app.post('/api/issueFine', (req, res) => {
     const { policeId, ruleId, driverId, finePrice } = req.body;
@@ -608,7 +638,7 @@ app.post('/api/upload' , async (req, res) => {
 })
 
 
-// invoice 
+// Invoice 
 app.post('/api/invoice', (req, res) => {
 
     const sql = `INSERT INTO invoice (p_id, r_id, date_time, if_id) VALUES(${req.body.p_id}, ${req.body.r_id}, CURRENT_TIMESTAMP(), ${req.body.if_id})`
@@ -623,3 +653,41 @@ app.post('/api/invoice', (req, res) => {
         }
     })
 })
+
+
+// Payment Gateway Testing
+app.post('/api/payment', (req, res) => {
+    const { cardNumber, cardHolder, expiryDate, cvv, amount } = req.body;
+
+    if(!cardNumber || !cardHolder || !expiryDate || !cvv || !amount) {
+        return res.status(400).json({message: 'Please enter all required fields'});
+    }
+
+    // cardNumber INT to String
+    const cardNumberString = cardNumber.toString();
+    const options = {
+        method: 'POST',
+        url: 'https://card-validator.p.rapidapi.com/validate',
+        headers: {
+          'content-type': 'application/json',
+          'X-RapidAPI-Key': '50437e9590msh036761da096f726p157a97jsn31198ee488cf',
+          'X-RapidAPI-Host': 'card-validator.p.rapidapi.com'
+        },
+        data: {cardNumber: cardNumberString}
+      };
+
+      try {
+        const response = axios.request(options);
+        console.log(response.data);
+        let cardState = true;
+      } catch (error) {
+        console.error(error);
+        let cardState = false;
+      }
+
+    if(cardState) {
+        return res.status(200).json({message: 'Card is valid. Payment successful'});
+    } else {
+        return res.status(400).json({message: 'Card is invalid. Payment failed'});
+    }
+});
