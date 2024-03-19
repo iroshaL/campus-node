@@ -656,7 +656,7 @@ app.post('/api/invoice', (req, res) => {
 
 
 // Payment Gateway Testing
-app.post('/api/payment', (req, res) => {
+app.post('/api/payment', async (req, res) => {
     const { cardNumber, cardHolder, expiryDate, cvv, amount } = req.body;
 
     if(!cardNumber || !cardHolder || !expiryDate || !cvv || !amount) {
@@ -677,17 +677,16 @@ app.post('/api/payment', (req, res) => {
       };
 
       try {
-        const response = axios.request(options);
+        const response = await axios.request(options);
         console.log(response.data);
-        let cardState = true;
-      } catch (error) {
-        console.error(error);
-        let cardState = false;
-      }
 
-    if(cardState) {
-        return res.status(200).json({message: 'Card is valid. Payment successful'});
-    } else {
-        return res.status(400).json({message: 'Card is invalid. Payment failed'});
+        if (response.data.isValid) {
+            return res.status(200).json({ message: 'Card is valid. Payment successful' });
+        } else {
+            return res.status(400).json({ message: 'Card is invalid. Payment failed' });
+        }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 });
