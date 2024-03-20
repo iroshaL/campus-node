@@ -166,10 +166,10 @@ app.get('/api/notification/get/:id', (req, res) => {
 
 // Update Payment in Issued Fines
 app.put('/api/payment/update', (req, res) => {
-    const { if_id, payment } = req.body;
+    const if_id = req.body;
     const sql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
 
-    pool.query(sql, [if_id], (err, result) => {
+    pool.query(sql, if_id, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
