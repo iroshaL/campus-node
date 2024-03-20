@@ -166,80 +166,94 @@ app.get('/api/notification/get/:id', (req, res) => {
 
 // Add Police to System
 app.post('/api/police', (req, res) => {
-    const {national_id, id, name, address, phone_number, email, password, confirm_password} = req.body;
+    const { national_id, id, name, address, phone_number, email, password, confirm_password } = req.body;
 
-    if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
+    if (!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
         return res.status(400).send('Please enter all required fields');
     }
 
-    if(password !== confirm_password) {
+    if (password !== confirm_password) {
         return res.status(400).send('Password do not match');
     }
 
-    const idCheckSQL = "SELECT * FROM police WHERE p_id = ?";
-    pool.query(idCheckSQL, [id], (err, result) => {
-        if(err) {
+    // Get a connection from the pool
+    pool.getConnection((err, connection) => {
+        if (err) {
             console.log(err);
-            return res.status(500).json({message: 'Internal server error'});
+            return res.status(500).json({ message: 'Failed to get connection from pool' });
         }
 
-        if(result.length > 0) {
-            return res.status(400).send('ID already exists');
-        }
-
-        const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
-        pool.query(emailCheckSQL, [email], (err, result) => {
-            if(err) {
+        // Start a transaction
+        connection.beginTransaction((err) => {
+            if (err) {
                 console.log(err);
-                return res.status(500).json({message: 'Internal server error'});
+                connection.release(); // Release the connection
+                return res.status(500).json({ message: 'Internal server error' });
             }
 
-            if(result.length > 0) {
-                return res.status(400).send('Email already exists');
-            }
-
-            const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-            const values1 = [email, password, 'police'];
-        
-            pool.query(sql1, values1, (err, result) => {
-                if(err) {
+            const idCheckSQL = "SELECT * FROM police WHERE p_id = ?";
+            connection.query(idCheckSQL, [id], (err, result) => {
+                if (err) {
                     console.log(err);
-                    return res.status(500).json({message: 'Internal server error'});
+                    rollbackAndRelease(connection, res, 'Internal server error');
+                    return;
                 }
-        
-                const user_id = result.insertId;
-        
-                const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-                const values = [national_id, id, name, address, phone_number, email, password, user_id];
-            
-                pool.query(sql, values, (err, result) => {
-                    if(err) {
+
+                if (result.length > 0) {
+                    rollbackAndRelease(connection, res, 'ID already exists');
+                    return;
+                }
+
+                const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
+                connection.query(emailCheckSQL, [email], (err, result) => {
+                    if (err) {
                         console.log(err);
-                        return res.status(500).json({message: 'Internal server error'});
+                        rollbackAndRelease(connection, res, 'Internal server error');
+                        return;
                     }
-                    return res.status(200).json({message: 'Police added successfully'});
+
+                    if (result.length > 0) {
+                        rollbackAndRelease(connection, res, 'Email already exists');
+                        return;
+                    }
+
+                    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+                    const values1 = [email, password, 'police'];
+
+                    connection.query(sql1, values1, (err, result) => {
+                        if (err) {
+                            console.log(err);
+                            rollbackAndRelease(connection, res, 'Internal server error');
+                            return;
+                        }
+
+                        const user_id = result.insertId;
+
+                        const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+                        const values = [national_id, id, name, address, phone_number, email, password, user_id];
+
+                        connection.query(sql, values, (err, result) => {
+                            if (err) {
+                                console.log(err);
+                                rollbackAndRelease(connection, res, 'Internal server error');
+                                return;
+                            }
+
+                            // Commit the transaction if all queries succeed
+                            connection.commit((err) => {
+                                if (err) {
+                                    console.log(err);
+                                    rollbackAndRelease(connection, res, 'Internal server error');
+                                    return;
+                                }
+
+                                // Release the connection
+                                connection.release();
+                                return res.status(200).json({ message: 'Police added successfully' });
+                            });
+                        });
+                    });
                 });
-            });
-        });        const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-        const values1 = [email, password, 'police'];
-    
-        pool.query(sql1, values1, (err, result) => {
-            if(err) {
-                console.log(err);
-                return res.status(500).json({message: 'Internal server error'});
-            }
-    
-            const user_id = result.insertId;
-    
-            const sql = 'INSERT INTO police (nic, p_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-            const values = [national_id, id, name, address, phone_number, email, password, user_id];
-        
-            pool.query(sql, values, (err, result) => {
-                if(err) {
-                    console.log(err);
-                    return res.status(500).json({message: 'Internal server error'});
-                }
-                return res.status(200).json({message: 'Police added successfully'});
             });
         });
     });
@@ -418,7 +432,6 @@ app.post('/api/driver', (req, res) => {
 });
 
 
-
 // Get Specific Police by ID
 app.get('/api/police/:id', (req, res) => {
     const sql = "SELECT * FROM police WHERE p_id = ?";
@@ -534,28 +547,44 @@ app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
 
+
 // login
-app.post('/api/auth/login', (req,res) => {
-
-    const sql = "SELECT * FROM users WHERE email = ?"
-
+app.post('/api/auth/login', (req, res) => {
+    const sql = "SELECT * FROM users WHERE email = ?";
     pool.query(sql, [req.body.email], (err, data) => {
-        
         if (err) {
             console.log(err);
-            return res.json('Error');
+            return res.status(500).json({ message: 'Internal server error' });
         } 
 
         if (data.length > 0) {
-            console.log(data)
-            if (req.body.password == data[0].password) {
+            if (req.body.password === data[0].password) {
                 console.log('logged in');
-                return res.json(data);
+                console.log(data);
+                console.log(data[0].user_id);
+
+                const user_id = data[0].user_id;
+                const sql = "SELECT * FROM driver WHERE user_id = ?";
+                const values = [user_id];
+
+                pool.query(sql, values, (err, data) => {
+                    if (err) {
+                        console.log(err);
+                        return res.status(500).json({ message: 'Internal server error' });
+                    } else {
+                        console.log(data);
+                        return res.json(data);
+                    }
+                })
+            } else {
+                return res.status(401).json({ message: 'Unauthorized' });
             }
+        } else {
+            return res.status(401).json({ message: 'Unauthorized' });
         }
-        return res.status(401).json({ message: 'Unauthorized' });
     });
 });
+
 
 // get rules for police
 app.get('/api/rules', (req, res) => {
