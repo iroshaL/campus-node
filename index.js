@@ -246,73 +246,170 @@ app.post('/api/police', (req, res) => {
 });
 
 
+// // Add Driver to System
+// app.post('/api/driver', (req, res) => {
+//     const {nic, id, name, address, phone_number, email, password, confirm_password} = req.body;
+
+//     console.log(req.body);
+//     if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
+//         return res.status(400).send('Please enter all required fields');
+//     }
+
+//     if(password !== confirm_password) {
+//         return res.status(400).send('Password do not match');
+//     }
+
+//     const idCheckSQL = "SELECT * FROM driver WHERE d_id = ?";
+//     pool.query(idCheckSQL, [id], (err, result) => {
+//         if(err) {
+//             console.log(err);
+//             return res.status(500).json({message: 'Internal server error'});
+//         }
+
+//         if(result.length > 0) {
+//             return res.status(400).send('ID already exists');
+//         }
+
+//         const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
+//         pool.query(emailCheckSQL, [email], (err, result) => {
+//             if(err) {
+//                 console.log(err);
+//                 return res.status(500).json({message: 'Internal server error'});
+//             }
+
+//             if (result.length > 0) {
+//                 return res.status(400).send('Email already exists');
+//             }
+
+//             const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+//             const values1 = [email, password, 'driver'];
+        
+//             pool.query(sql1, values1, (err, result) => {
+//                 if(err) {
+//                     console.log(err);
+//                     return res.status(500).json({message: 'Internal server error'});
+//                 }
+        
+//                 const user_id = result.insertId;
+        
+//                 // qr gen
+//                 const QRCode = require('qrcode');
+            
+//                 QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
+//                     errorCorrectionLevel: 'H'
+//                 }, function(err) {
+//                     if (err) {
+//                         console.log(err);
+//                         return res.status(500).json({message: 'Internal server error'});
+//                     }
+//                     console.log('QR code saved!');
+        
+//                     const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+//                     const values = [nic, id, name, address, phone_number, email, password, user_id];
+                
+//                     pool.query(sql, values, (err, result) => {
+//                         if(err) {
+//                             console.log(err);
+//                             return res.status(500).json({message: 'Internal server error'});
+//                         }
+//                         return res.status(200).json({message: 'Driver added successfully'});
+//                     });
+//                 });
+//             });
+//         });
+//     });
+// });
+
+
 // Add Driver to System
 app.post('/api/driver', (req, res) => {
-    const {nic, id, name, address, phone_number, email, password, confirm_password} = req.body;
+    const { nic, id, name, address, phone_number, email, password, confirm_password } = req.body;
 
-    console.log(req.body);
-    if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
+    if (!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
         return res.status(400).send('Please enter all required fields');
     }
 
-    if(password !== confirm_password) {
+    if (password !== confirm_password) {
         return res.status(400).send('Password do not match');
     }
 
-    const idCheckSQL = "SELECT * FROM driver WHERE d_id = ?";
-    pool.query(idCheckSQL, [id], (err, result) => {
-        if(err) {
+    pool.getConnection((err, connection) => {
+        if (err) {
             console.log(err);
-            return res.status(500).json({message: 'Internal server error'});
+            return res.status(500).json({ message: 'Internal server error' });
         }
 
-        if(result.length > 0) {
-            return res.status(400).send('ID already exists');
-        }
-
-        const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
-        pool.query(emailCheckSQL, [email], (err, result) => {
-            if(err) {
+        connection.beginTransaction((err) => {
+            if (err) {
                 console.log(err);
-                return res.status(500).json({message: 'Internal server error'});
+                connection.release();
+                return res.status(500).json({ message: 'Internal server error' });
             }
 
-            if (result.length > 0) {
-                return res.status(400).send('Email already exists');
-            }
-
-            const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-            const values1 = [email, password, 'driver'];
-        
-            pool.query(sql1, values1, (err, result) => {
-                if(err) {
+            const idCheckSQL = "SELECT * FROM driver WHERE d_id = ?";
+            connection.query(idCheckSQL, [id], (err, result) => {
+                if (err) {
                     console.log(err);
-                    return res.status(500).json({message: 'Internal server error'});
+                    return rollbackAndRelease(connection, res, 'Internal server error');
                 }
-        
-                const user_id = result.insertId;
-        
-                // qr gen
-                const QRCode = require('qrcode');
-            
-                QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
-                    errorCorrectionLevel: 'H'
-                }, function(err) {
+
+                if (result.length > 0) {
+                    return rollbackAndRelease(connection, res, 'ID already exists');
+                }
+
+                const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
+                connection.query(emailCheckSQL, [email], (err, result) => {
                     if (err) {
                         console.log(err);
-                        return res.status(500).json({message: 'Internal server error'});
+                        return rollbackAndRelease(connection, res, 'Internal server error');
                     }
-                    console.log('QR code saved!');
-        
-                    const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-                    const values = [nic, id, name, address, phone_number, email, password, user_id];
-                
-                    pool.query(sql, values, (err, result) => {
-                        if(err) {
+
+                    if (result.length > 0) {
+                        return rollbackAndRelease(connection, res, 'Email already exists');
+                    }
+
+                    const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
+                    const values1 = [email, password, 'driver'];
+
+                    connection.query(sql1, values1, (err, result) => {
+                        if (err) {
                             console.log(err);
-                            return res.status(500).json({message: 'Internal server error'});
+                            return rollbackAndRelease(connection, res, 'Internal server error');
                         }
-                        return res.status(200).json({message: 'Driver added successfully'});
+
+                        const user_id = result.insertId;
+
+                        const QRCode = require('qrcode');
+                        QRCode.toFile(`./qr/${id}.png`, toString(id), {
+                            errorCorrectionLevel: 'H'
+                        }, function (err) {
+                            if (err) {
+                                console.log(err);
+                                return rollbackAndRelease(connection, res, 'Internal server error');
+                            }
+
+                            console.log('QR code saved!');
+
+                            const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+                            const values = [nic, id, name, address, phone_number, email, password, user_id];
+
+                            connection.query(sql, values, (err, result) => {
+                                if (err) {
+                                    console.log(err);
+                                    return rollbackAndRelease(connection, res, 'Internal server error');
+                                }
+
+                                connection.commit((err) => {
+                                    if (err) {
+                                        console.log(err);
+                                        return rollbackAndRelease(connection, res, 'Internal server error');
+                                    }
+
+                                    connection.release();
+                                    return res.status(200).json({ message: 'Driver added successfully' });
+                                });
+                            });
+                        });
                     });
                 });
             });
@@ -690,3 +787,12 @@ app.post('/api/payment', async (req, res) => {
         return res.status(500).json({ message: 'Internal server error' });
     }
 });
+
+
+// Error Handling Function
+function rollbackAndRelease(connection, res, message) {
+    connection.rollback(() => {
+        connection.release();
+        return res.status(500).json({ message });
+    });
+}
