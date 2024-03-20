@@ -172,8 +172,10 @@ app.put('/api/payment/update', (req, res) => {
     pool.query(sql, if_id, (err, result) => {
         if(err) {
             console.log(err);
+            console.log('Error  executing query: ', err);
             return res.status(500).json({message: 'Internal server error'});
         }
+        console.log('Fine Status Updated');
         return res.status(200).json({message: 'Payment updated successfully'});
     });
 });
@@ -771,8 +773,7 @@ app.post('/api/upload' , async (req, res) => {
 
     var realfile = Buffer.from(req.body.image, "base64")
     fs.writeFileSync(req.body.name, realfile, "utf8")
-
-})
+});
 
 
 // Invoice 
