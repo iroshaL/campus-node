@@ -411,7 +411,7 @@ app.post('/api/driver', (req, res) => {
                         const user_id = result.insertId;
 
                         const QRCode = require('qrcode');
-                        QRCode.toFile(`./qr/${id}.png`, toString(id), {
+                        QRCode.toFile(`./qr/${id}.png`, JSON.stringify({ driver_id: id }), {
                             errorCorrectionLevel: 'H'
                         }, function (err) {
                             if (err) {
@@ -559,6 +559,20 @@ app.post('/api/issueFine', (req, res) => {
 });
 
 
+// Get Police by User ID
+app.get('/api/police/user/:id', (req, res) => {
+    const sql = "SELECT * FROM police WHERE user_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
 // login
 app.post('/api/auth/login', (req, res) => {
     const sql = "SELECT * FROM users WHERE email = ?";
@@ -685,19 +699,61 @@ app.get('/api/getfine', (req, res) => {
 
 // password reset
 app.post('/api/resetpassword', (req, res) => {
-    
-    const sql = "UPDATE users SET password = ? WHERE user_id = ?"
 
-    pool.query(sql, [req.body.pass], [req.body.id], (err, data) => {
+    const newPassword = req.body.pass;
+    const email = req.body.email
+    
+    const sql = "UPDATE users SET password = ? WHERE email = ?";
+    const values = [newPassword, email];
+
+    pool.query(sql, values, (err, data) => {
         if (err) {
             console.log(err)
             return res.json('error')
         } else {
-            console.log('password changes')
-            return res.json('success')
+            console.log('Password changeD')
+            return res.json('Success')
         }
-    })
-})
+    });
+});
+
+// verify otp
+app.post('/api/verifyotp', (req, res) => {
+    const otp = req.body.otp;
+    const sql = "SELECT * FROM users WHERE email = ?";
+    const values = [req.body.email];
+
+    pool.query(sql, values, (err, data) => {
+        console.log(data[0].otp)
+        if (err) {
+            console.log(err);
+            return res.json('error');
+        } else {
+            console.log(data);
+            if(data[0].otp === otp) {
+                return res.json('Correct OTP');
+            } else {
+                return res.json('Wrong OTP');
+            }
+        }
+    });
+});
+
+// get user_id with email
+app.get('/api/user/:email', (req, res) => {
+
+    const sql = "SELECT * FROM users WHERE email = ?"
+
+    pool.query(sql, [req.params.email], (err, data) => {
+        if(err) {
+            console.log(err)
+            return res.json('err')
+        } else {
+            console.log(data)
+            return res.json(data)
+        }
+    });
+});
 
 // otp
 app.post('/api/otp', (req, res) => {
@@ -745,13 +801,13 @@ app.post('/api/otp', (req, res) => {
 
                 pool.query(sql, (err, data) => {
                     if (err) {
-                        console.log(err)
+                        console.log(err);
                         // return res.json('error')
                     } else {
-                        console.log('password changes')
+                        console.log('OTP Saved to user: ', data);
                         // return res.json('success')
                     }
-                })
+                });
 
                 // console.log("OTP saved to user:", user);
             } catch (error) {
@@ -771,21 +827,21 @@ app.post('/api/otp', (req, res) => {
 // upload file
 app.post('/api/upload' , async (req, res) => {
 
-    const { user_id, name } = req.body;
+    const { d_id, name } = req.body;
 
     var realfile = Buffer.from(req.body.image, "base64")
     fs.writeFileSync(req.body.name, realfile, "utf8")
 
-    saveDocumentToDatabase(user_id, name);
+    saveDocumentToDatabase(d_id, name);
 
     return res.status(200).json({ message: 'Document uploaded successfully' });
 });
 
 
-function saveDocumentToDatabase(user_id, doc_name) {
+function saveDocumentToDatabase(d_id, doc_name) {
     // Assuming you're using a MySQL database
-    const sql = 'INSERT INTO document (user_id, doc_name) VALUES (?, ?)';
-    const values = [user_id, doc_name];
+    const sql = 'INSERT INTO document (d_id, doc_name) VALUES (?, ?)';
+    const values = [d_id, doc_name];
 
     // Execute the SQL query to insert document details
     pool.query(sql, values, (err, result) => {
