@@ -164,6 +164,21 @@ app.get('/api/notification/get/:id', (req, res) => {
 });
 
 
+// Update Payment in Issued Fines
+app.put('/api/payment/update', (req, res) => {
+    const { if_id, payment } = req.body;
+    const sql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
+
+    pool.query(sql, [if_id], (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json({message: 'Payment updated successfully'});
+    });
+});
+
+
 // Add Police to System
 app.post('/api/police', (req, res) => {
     const { national_id, id, name, address, phone_number, email, password, confirm_password } = req.body;
@@ -557,6 +572,7 @@ app.post('/api/auth/login', (req, res) => {
                 console.log(data);
                 console.log(data[0].user_id);
 
+                const user_data = data[0];
                 const user_id = data[0].user_id;
                 const sql = "SELECT * FROM driver WHERE user_id = ?";
                 const values = [user_id];
@@ -567,7 +583,8 @@ app.post('/api/auth/login', (req, res) => {
                         return res.status(500).json({ message: 'Internal server error' });
                     } else {
                         console.log(data);
-                        return res.json(data);
+                        const allData = [user_data, data[0]];
+                        return res.json(allData);
                     }
                 })
             } else {
