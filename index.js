@@ -542,12 +542,6 @@ app.post('/api/issueFine', (req, res) => {
 });
 
 
-const port = 3000;
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
-
-
 // login
 app.post('/api/auth/login', (req, res) => {
     const sql = "SELECT * FROM users WHERE email = ?";
@@ -825,3 +819,9 @@ function rollbackAndRelease(connection, res, message) {
         return res.status(500).json({ message });
     });
 }
+
+
+const port = 3000;
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
