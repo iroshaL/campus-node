@@ -573,6 +573,7 @@ app.get('/api/police/user/:id', (req, res) => {
     });
 });
 
+
 // login
 app.post('/api/auth/login', (req, res) => {
     const sql = "SELECT * FROM users WHERE email = ?";
