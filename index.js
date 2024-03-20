@@ -771,9 +771,33 @@ app.post('/api/otp', (req, res) => {
 // upload file
 app.post('/api/upload' , async (req, res) => {
 
+    const { user_id, name } = req.body;
+
     var realfile = Buffer.from(req.body.image, "base64")
     fs.writeFileSync(req.body.name, realfile, "utf8")
+
+    saveDocumentToDatabase(user_id, name);
+
+    return res.status(200).json({ message: 'Document uploaded successfully' });
 });
+
+
+function saveDocumentToDatabase(user_id, doc_name) {
+    // Assuming you're using a MySQL database
+    const sql = 'INSERT INTO document (user_id, doc_name) VALUES (?, ?)';
+    const values = [user_id, doc_name];
+
+    // Execute the SQL query to insert document details
+    pool.query(sql, values, (err, result) => {
+        if (err) {
+            console.log('Error saving document details to database:', err);
+            // Handle error
+        } else {
+            console.log('Document details saved to database');
+            // Document details successfully saved to database
+        }
+    });
+}
 
 
 // Invoice 
