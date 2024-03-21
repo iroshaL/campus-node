@@ -168,32 +168,65 @@ app.get('/api/notification/get/:id', (req, res) => {
 app.put('/api/payment/update', (req, res) => {
     const if_id = req.body.if_id;
     console.log(if_id);
-    const sql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
-    const values = [if_id];
-
-    pool.query(sql, values, (err, result) => {
-        if(err) {
-            console.error('Error updating fine status:', err);
-            return res.status(500).json({ message: 'Failed to update fine status' });
+    
+    // Start a transaction
+    pool.getConnection((err, connection) => {
+        if (err) {
+            console.error('Error connecting to database:', err);
+            return res.status(500).json({ message: 'Failed to connect to database' });
         }
 
-        console.log('Fine status updated successfully');
-
-        // Send Notification After Payment Done
-        const notificationSQL = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, (SELECT d_id FROM issued_fines WHERE if_id = ?))";
-        const notificationValues = ["Fine is Paid by Driver ID - " + if_id, if_id];
-
-        pool.query(notificationSQL, notificationValues, (err, resultNotify) => {
+        connection.beginTransaction(err => {
             if (err) {
-                console.error('Error sending notification:', err);
-                return res.status(500).json({ message: 'Failed to send notification' });
+                console.error('Error starting transaction:', err);
+                connection.release();
+                return res.status(500).json({ message: 'Failed to start transaction' });
             }
 
-            console.log('Notification sent');
-            return res.status(200).json({ message: 'Payment updated successfully' });
+            // Update fine status
+            const updateSql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
+            connection.query(updateSql, [if_id], (err, updateResult) => {
+                if (err) {
+                    console.error('Error updating fine status:', err);
+                    return connection.rollback(() => {
+                        connection.release();
+                        res.status(500).json({ message: 'Failed to update fine status' });
+                    });
+                }
+
+                // Insert notification
+                const notificationSql = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, (SELECT d_id FROM issued_fines WHERE if_id = ?))";
+                const notificationValues = ["Fine is Paid by Driver ID - " + if_id, if_id];
+
+                connection.query(notificationSql, notificationValues, (err, notificationResult) => {
+                    if (err) {
+                        console.error('Error inserting notification:', err);
+                        return connection.rollback(() => {
+                            connection.release();
+                            res.status(500).json({ message: 'Failed to insert notification' });
+                        });
+                    }
+
+                    // Commit the transaction if everything is successful
+                    connection.commit(err => {
+                        if (err) {
+                            console.error('Error committing transaction:', err);
+                            return connection.rollback(() => {
+                                connection.release();
+                                res.status(500).json({ message: 'Failed to commit transaction' });
+                            });
+                        }
+
+                        console.log('Transaction committed successfully');
+                        connection.release();
+                        res.status(200).json({ message: 'Payment updated and notification sent successfully' });
+                    });
+                });
+            });
         });
     });
 });
+
 
 
 
