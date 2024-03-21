@@ -167,9 +167,11 @@ app.get('/api/notification/get/:id', (req, res) => {
 // Update Payment in Issued Fines
 app.put('/api/payment/update', (req, res) => {
     const if_id = req.body;
+    console.log(if_id.if_id);
     const sql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
+    const values = if_id.if_id;
 
-    pool.query(sql, if_id, (err, result) => {
+    pool.query(sql, values, (err, result) => {
         if(err) {
             console.log(err);
             console.log('Error  executing query: ', err);
@@ -177,6 +179,62 @@ app.put('/api/payment/update', (req, res) => {
         }
         console.log('Fine Status Updated');
         return res.status(200).json({message: 'Payment updated successfully'});
+    });
+});
+
+
+// Get Data From Rule Table and Issued Fines Table by IF_ID
+app.get("/api/fineDetails/:id", (req, res) => {
+    const ifId = req.params.id;
+    const sql = "SELECT * FROM issued_fines WHERE if_id = ?";
+    const values = [ifId];
+
+    pool.query(sql, values, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        console.log(result);
+        
+        const ruleId = result[0].r_id;
+        const ruleSQL = "SELECT * FROM rules WHERE r_id = ?";
+        const ruleValues = [ruleId];
+
+        pool.query(ruleSQL, ruleValues, (err, ruleResult) => {
+            if(err) {
+                console.log(err);
+                return res.status(500).json({message: 'Internal server error'});
+            }
+            console.log(ruleResult);
+            const finalResult = [result, ruleResult];
+            return res.status(200).json(finalResult);
+        });
+    });
+});
+
+
+// Get All Pending Fines
+app.get('/api/pendingFines', (req, res) => {
+    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'pending'";
+    pool.query(sql, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
+    });
+});
+
+
+// Get All Paid Fines
+app.get('/api/paidFines', (req, res) => {
+    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'paid'";
+    pool.query(sql, (err, result) => {
+        if(err) {
+            console.log(err);
+            return res.status(500).json({message: 'Internal server error'});
+        }
+        return res.status(200).json(result);
     });
 });
 
@@ -539,9 +597,14 @@ app.get('/api/police/user/:id', (req, res) => {
 
 // Issue Fine
 app.post('/api/issueFine', (req, res) => {
-    const { policeId, ruleId, driverId, finePrice } = req.body;
+    // const { policeId, ruleId, driverId, finePrice } = req.body;
+    console.log(req.body);
+    const policeId = parseInt(req.body.policeId);
+    const ruleId = parseInt(req.body.ruleId);
+    const driverId = parseInt(req.body.driverId);
+    const finePrice = req.body.finePrice;
 
-    if(!policeId, !ruleId, !driverId, !finePrice) {
+    if(!policeId || !ruleId || !driverId || !finePrice) {
         return res.status(400).json({message: 'Please enter all required fields'});
     }
 
@@ -554,6 +617,7 @@ app.post('/api/issueFine', (req, res) => {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
+        console.log('Fine issued successfully');
         return res.status(200).json({message: 'Fine issued successfully'});
     });
 });
@@ -651,20 +715,20 @@ app.get('/api/getdriver/:id', (req, res) => {
 })
 
 //issue fine
-app.post('/api/issuefine', (req, res) => {
+// app.post('/api/issuefine', (req, res) => {
 
-    const sql = "INSERT INTO issued_fines (d_id, r_id, p_id, fine_status, date) VALUES (?, ?, ?, ?, CURDATE())";
-    const values = [req.body.d_id, req.body.r_id, req.body.p_id, "pending"];
+//     const sql = "INSERT INTO issued_fines (d_id, r_id, p_id, fine_status, date) VALUES (?, ?, ?, ?, CURDATE())";
+//     const values = [req.body.d_id, req.body.r_id, req.body.p_id, "pending"];
 
-    pool.query(sql, values, (err, data) => {
-        if (err) {
-            console.log(err)
-            return res.json('err')
-        } else {
-            return res.json('success')
-        }
-    });
-});
+//     pool.query(sql, values, (err, data) => {
+//         if (err) {
+//             console.log(err)
+//             return res.json('err')
+//         } else {
+//             return res.json('success')
+//         }
+//     });
+// });
 
 // get all fines
 app.get('/api/getfine', (req, res) => {
@@ -718,27 +782,33 @@ app.post('/api/resetpassword', (req, res) => {
     });
 });
 
+
 // verify otp
 app.post('/api/verifyotp', (req, res) => {
     const otp = req.body.otp;
+    console.log(req.body);
+    console.log("OTP Code - " + otp);
+    console.log("Email - " + req.body.email);
     const sql = "SELECT * FROM users WHERE email = ?";
     const values = [req.body.email];
 
     pool.query(sql, values, (err, data) => {
-        console.log(data[0].otp)
         if (err) {
-            console.log(err);
-            return res.json('error');
+            console.log("Database error:", err);
+            return res.status(500).json({ message: 'Database error' });
         } else {
-            console.log(data);
-            if(data[0].otp === otp) {
+            console.log("User data:", data);
+            if (data.length > 0 && parseInt(data[0].otp) === parseInt(otp)) {
+                console.log('Correct OTP');
                 return res.json('Correct OTP');
             } else {
-                return res.json('Wrong OTP');
+                console.log('Wrong OTP or user not found');
+                return res.json('Wrong OTP or user not found');
             }
         }
     });
 });
+
 
 // get user_id with email
 app.get('/api/user/:email', (req, res) => {
@@ -755,6 +825,7 @@ app.get('/api/user/:email', (req, res) => {
         }
     });
 });
+
 
 // otp
 app.post('/api/otp', (req, res) => {
