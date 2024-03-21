@@ -166,21 +166,35 @@ app.get('/api/notification/get/:id', (req, res) => {
 
 // Update Payment in Issued Fines
 app.put('/api/payment/update', (req, res) => {
-    const if_id = req.body;
-    console.log(if_id.if_id);
+    const if_id = req.body.if_id;
+    console.log(if_id);
     const sql = "UPDATE issued_fines SET fine_status = 'paid' WHERE if_id = ?";
-    const values = if_id.if_id;
+    const values = [if_id];
 
     pool.query(sql, values, (err, result) => {
         if(err) {
-            console.log(err);
-            console.log('Error  executing query: ', err);
-            return res.status(500).json({message: 'Internal server error'});
+            console.error('Error updating fine status:', err);
+            return res.status(500).json({ message: 'Failed to update fine status' });
         }
-        console.log('Fine Status Updated');
-        return res.status(200).json({message: 'Payment updated successfully'});
+
+        console.log('Fine status updated successfully');
+
+        // Send Notification After Payment Done
+        const notificationSQL = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, (SELECT d_id FROM issued_fines WHERE if_id = ?))";
+        const notificationValues = ["Fine is Paid by Driver ID - " + if_id, if_id];
+
+        pool.query(notificationSQL, notificationValues, (err, resultNotify) => {
+            if (err) {
+                console.error('Error sending notification:', err);
+                return res.status(500).json({ message: 'Failed to send notification' });
+            }
+
+            console.log('Notification sent');
+            return res.status(200).json({ message: 'Payment updated successfully' });
+        });
     });
 });
+
 
 
 // Get Data From Rule Table and Issued Fines Table by IF_ID
