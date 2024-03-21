@@ -260,10 +260,11 @@ app.get("/api/fineDetails/:id", (req, res) => {
 });
 
 
-// Get All Pending Fines
-app.get('/api/pendingFines', (req, res) => {
-    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'pending'";
-    pool.query(sql, (err, result) => {
+// Get All Pending Fines for Specific Driver
+app.post('/api/pendingFines', (req, res) => {
+    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'pending' AND d_id = ?";
+    const driverId = req.body.d_id;
+    pool.query(sql, driverId, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
@@ -273,10 +274,11 @@ app.get('/api/pendingFines', (req, res) => {
 });
 
 
-// Get All Paid Fines
-app.get('/api/paidFines', (req, res) => {
-    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'paid'";
-    pool.query(sql, (err, result) => {
+// Get All Paid Fines for Specific Driver
+app.post('/api/paidFines', (req, res) => {
+    const sql = "SELECT * FROM issued_fines WHERE fine_status = 'paid' AND d_id = ?";
+    const values = [req.body.d_id];
+    pool.query(sql, driverId, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
