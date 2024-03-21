@@ -278,7 +278,7 @@ app.post('/api/pendingFines', (req, res) => {
 app.post('/api/paidFines', (req, res) => {
     const sql = "SELECT * FROM issued_fines WHERE fine_status = 'paid' AND d_id = ?";
     const values = [req.body.d_id];
-    pool.query(sql, driverId, (err, result) => {
+    pool.query(sql, values, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
@@ -977,6 +977,10 @@ function saveDocumentToDatabase(d_id, doc_name) {
 }
 
 
+// New Files Upload Section
+
+
+
 // Invoice 
 app.post('/api/invoice', (req, res) => {
 
@@ -990,8 +994,8 @@ app.post('/api/invoice', (req, res) => {
             console.log('invoice sent to database')
             return res.json('success')
         }
-    })
-})
+    });
+});
 
 
 // Payment Gateway Testing
