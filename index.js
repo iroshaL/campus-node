@@ -29,6 +29,7 @@ pool.getConnection((err, connection) => {
 const app = express();
 app.use(bodyParser.json());
 app.use('/static', express.static(staticFilesDirectory));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(express.json({ limit: '100mb' })); // Parse JSON bodies
 app.use(express.urlencoded({ limit: '100mb', extended: true })); // Parse URL-encoded bodies
@@ -966,6 +967,42 @@ function saveDocumentToDatabase(d_id, doc_name, res) {
         }
     });
 }
+
+
+// Get Uploaded Files By Driver ID
+app.get('/api/getFiles/:id', (req, res) => {
+    const sql = 'SELECT * FROM document WHERE d_id = ?';
+    const values = [req.params.id];
+    console.log(values);
+
+    pool.query(sql, values, (err, result) => {
+        if (err) {
+            console.log('Error fetching documents:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        console.log('Documents fetched successfully');
+        return res.status(200).json(result);
+    });
+});
+
+
+// Delete Uploaded Files By Document Id
+app.delete('/api/deleteDoc/:id', (req, res) => {
+    const sql = 'DELETE FROM document WHERE doc_id=?';
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, result) => {
+        if (err) {
+            console.log('Error deleting the file:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        console.log('File deleted successfully!');
+        return res.json({ message: 'Deleted successfully!' });
+    });
+});
+
 
 // Invoice 
 app.post('/api/invoice', (req, res) => {
