@@ -6,6 +6,8 @@ const cron = require('node-cron');
 const { createTransport } = require("nodemailer");
 const staticFilesDirectory = './qr';
 const axios = require('axios');
+const multer = require('multer');
+const path = require('path');
 
 const pool = mysql.createPool({
     host: "fine-management.c9w4gu4g2114.eu-north-1.rds.amazonaws.com",
@@ -194,7 +196,7 @@ app.put('/api/payment/update', (req, res) => {
                     });
                 }
 
-                // Insert notification
+                // Insert notification to Notify Police
                 const notificationSql = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, (SELECT d_id FROM issued_fines WHERE if_id = ?))";
                 const notificationValues = ["Fine is Paid by Driver ID - " + if_id, if_id];
 
@@ -207,19 +209,33 @@ app.put('/api/payment/update', (req, res) => {
                         });
                     }
 
-                    // Commit the transaction if everything is successful
-                    connection.commit(err => {
+                    // Insert notification to Notify Driver
+                    const notificationSql2 = "INSERT INTO notification (date_time, noti_data, d_id) VALUES (NOW(), ?, (SELECT d_id FROM issued_fines WHERE if_id = ?))";
+                    const notificationValues2 = ["You have Successfully Paid the Fine for - " + if_id +" Fine.", if_id];
+
+                    connection.query(notificationSql2,notificationValues2, (err, notificationResult2) => {
                         if (err) {
-                            console.error('Error committing transaction:', err);
+                            console.error('Error inserting notification:', err);
                             return connection.rollback(() => {
                                 connection.release();
-                                res.status(500).json({ message: 'Failed to commit transaction' });
+                                res.status(500).json({ message: 'Failed to insert notification' });
                             });
                         }
 
-                        console.log('Transaction committed successfully');
-                        connection.release();
-                        res.status(200).json({ message: 'Payment updated and notification sent successfully' });
+                        // Commit the transaction if everything is successful
+                        connection.commit(err => {
+                            if (err) {
+                                console.error('Error committing transaction:', err);
+                                return connection.rollback(() => {
+                                    connection.release();
+                                    res.status(500).json({ message: 'Failed to commit transaction' });
+                                });
+                            }
+
+                            console.log('Transaction committed successfully');
+                            connection.release();
+                            res.status(200).json({ message: 'Payment updated and notification sent successfully' });
+                        });
                     });
                 });
             });
@@ -382,81 +398,6 @@ app.post('/api/police', (req, res) => {
         });
     });
 });
-
-
-// // Add Driver to System
-// app.post('/api/driver', (req, res) => {
-//     const {nic, id, name, address, phone_number, email, password, confirm_password} = req.body;
-
-//     console.log(req.body);
-//     if(!id || !name || !address || !phone_number || !email || !password || !confirm_password) {
-//         return res.status(400).send('Please enter all required fields');
-//     }
-
-//     if(password !== confirm_password) {
-//         return res.status(400).send('Password do not match');
-//     }
-
-//     const idCheckSQL = "SELECT * FROM driver WHERE d_id = ?";
-//     pool.query(idCheckSQL, [id], (err, result) => {
-//         if(err) {
-//             console.log(err);
-//             return res.status(500).json({message: 'Internal server error'});
-//         }
-
-//         if(result.length > 0) {
-//             return res.status(400).send('ID already exists');
-//         }
-
-//         const emailCheckSQL = "SELECT * FROM users WHERE email = ?";
-//         pool.query(emailCheckSQL, [email], (err, result) => {
-//             if(err) {
-//                 console.log(err);
-//                 return res.status(500).json({message: 'Internal server error'});
-//             }
-
-//             if (result.length > 0) {
-//                 return res.status(400).send('Email already exists');
-//             }
-
-//             const sql1 = 'INSERT INTO users (email, password, role) VALUES (?, ?, ?)';
-//             const values1 = [email, password, 'driver'];
-        
-//             pool.query(sql1, values1, (err, result) => {
-//                 if(err) {
-//                     console.log(err);
-//                     return res.status(500).json({message: 'Internal server error'});
-//                 }
-        
-//                 const user_id = result.insertId;
-        
-//                 // qr gen
-//                 const QRCode = require('qrcode');
-            
-//                 QRCode.toFile(`./qr/${user_id}.png`, toString(user_id), {
-//                     errorCorrectionLevel: 'H'
-//                 }, function(err) {
-//                     if (err) {
-//                         console.log(err);
-//                         return res.status(500).json({message: 'Internal server error'});
-//                     }
-//                     console.log('QR code saved!');
-        
-//                     const sql = 'INSERT INTO driver (nic, d_id, name, address, phone, email, password, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-//                     const values = [nic, id, name, address, phone_number, email, password, user_id];
-                
-//                     pool.query(sql, values, (err, result) => {
-//                         if(err) {
-//                             console.log(err);
-//                             return res.status(500).json({message: 'Internal server error'});
-//                         }
-//                         return res.status(200).json({message: 'Driver added successfully'});
-//                     });
-//                 });
-//             });
-//         });
-//     });
-// });
 
 
 // Add Driver to System
@@ -977,8 +918,51 @@ function saveDocumentToDatabase(d_id, doc_name) {
 }
 
 
-// New Files Upload Section
+// ==>> New Files Upload Section
 
+// Set Storage Engine
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, './uploads/'); // Save uploaded files to the 'uploads' directory
+    },
+    filename: function(req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname); // Append a unique suffix to the original file name
+    }
+});
+
+
+// Initialize multer upload
+const upload = multer({
+    storage: storage,
+});
+
+
+// Upload file
+app.post('/api/uploadFile', upload.single('image'), async(req, res) => {
+    const d_id = req.body.d_id;
+    const name = req.file.filename; // Get the filename generated by multer
+
+    saveDocumentToDatabase(d_id, name, res); // Pass the 'res' object to the function
+
+    return res.status(200).json({ message: 'Document uploaded successfully' });
+});
+
+
+function saveDocumentToDatabase(d_id, doc_name, res) {
+    const sql = 'INSERT INTO document (d_id, doc_name) VALUES (?, ?)';
+    const values = [d_id, doc_name];
+
+    pool.query(sql, values, (err, result) => {
+        if (err) {
+            console.log('Error saving document details to database:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        } else {
+            console.log('Document details saved to database');
+            return res.status(200).json({ message: 'Document details saved to database' });
+        }
+    });
+}
 
 
 // Invoice 
