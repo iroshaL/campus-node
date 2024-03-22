@@ -987,19 +987,30 @@ app.get('/api/getFiles/:id', (req, res) => {
 });
 
 
-// Delete Uploaded Files By Document Id
-app.delete('/api/deleteDoc/:id', (req, res) => {
-    const sql = 'DELETE FROM document WHERE doc_id=?';
-    const values = [req.params.id];
+// Delete Uploaded Files By Document Name
+app.delete('/api/deleteDoc/:name', (req, res) => {
+    const docName = req.params.name;
+    const sql = 'DELETE FROM document WHERE doc_name=?';
+    const values = [docName];
 
     pool.query(sql, values, (err, result) => {
         if (err) {
-            console.log('Error deleting the file:', err);
+            console.log('Error deleting the file from database:', err);
             return res.status(500).json({ message: 'Internal server error' });
         }
 
-        console.log('File deleted successfully!');
-        return res.json({ message: 'Deleted successfully!' });
+        console.log('File deleted from database successfully!');
+
+        // Delete file from storage directory
+        const filePath = path.join(__dirname, 'uploads', docName);
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                console.log('Error deleting the file from storage:', err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+            console.log('File deleted from storage successfully!');
+            return res.json({ message: 'Deleted successfully!' });
+        });
     });
 });
 
