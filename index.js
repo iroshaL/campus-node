@@ -280,21 +280,41 @@ app.get("/api/fineDetails/:id", (req, res) => {
 });
 
 
-// Get All Pending Fines for Specific Driver
+// Get All Pending Fines with Rule Name for Specific Driver
 app.post('/api/pendingFines', (req, res) => {
     const sql = "SELECT * FROM issued_fines WHERE fine_status = 'pending' AND d_id = ?";
-    const driverId = req.body.d_id;
-    pool.query(sql, driverId, (err, result) => {
+    const values = [req.body.d_id];
+
+    pool.query(sql, values, (err, result) => {
         if(err) {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
-        return res.status(200).json(result);
+
+        const finalResult = [];
+
+        result.forEach(fine => {
+            const ruleId = fine.r_id;
+            const ruleSQL = "SELECT * FROM rules WHERE r_id = ?";
+            const ruleValues = [ruleId];
+
+            pool.query(ruleSQL, ruleValues, (err, ruleResult) => {
+                if(err) {
+                    console.log(err);
+                    return res.status(500).json({message: 'Internal server error'});
+                }
+
+                finalResult.push({fine, rule: ruleResult[0]});
+                if(finalResult.length === result.length) {
+                    return res.status(200).json(finalResult);
+                }
+            });
+        });
     });
 });
 
 
-// Get All Paid Fines for Specific Driver
+// Get All Paid Fines with Rule Name for Specific Driver
 app.post('/api/paidFines', (req, res) => {
     const sql = "SELECT * FROM issued_fines WHERE fine_status = 'paid' AND d_id = ?";
     const values = [req.body.d_id];
@@ -303,7 +323,26 @@ app.post('/api/paidFines', (req, res) => {
             console.log(err);
             return res.status(500).json({message: 'Internal server error'});
         }
-        return res.status(200).json(result);
+
+        const finalResult = [];
+
+        result.forEach(fine => {
+            const ruleId = fine.r_id;
+            const ruleSQL = "SELECT * FROM rules WHERE r_id = ?";
+            const ruleValues = [ruleId];
+
+            pool.query(ruleSQL, ruleValues, (err, ruleResult) => {
+                if(err) {
+                    console.log(err);
+                    return res.status(500).json({message: 'Internal server error'});
+                }
+
+                finalResult.push({fine, rule: ruleResult[0]});
+                if(finalResult.length === result.length) {
+                    return res.status(200).json(finalResult);
+                }
+            });
+        });
     });
 });
 
@@ -591,30 +630,49 @@ app.get('/api/police/user/:id', (req, res) => {
 
 // Issue Fine
 app.post('/api/issueFine', (req, res) => {
-    // const { policeId, ruleId, driverId, finePrice } = req.body;
-    console.log(req.body);
+    // Extract data from the request body
     const policeId = parseInt(req.body.policeId);
     const ruleId = parseInt(req.body.ruleId);
     const driverId = parseInt(req.body.driverId);
     const finePrice = req.body.finePrice;
 
-    if(!policeId || !ruleId || !driverId || !finePrice) {
-        return res.status(400).json({message: 'Please enter all required fields'});
+    // Check if all required fields are provided
+    if (!policeId || !ruleId || !driverId || !finePrice) {
+        return res.status(400).json({ message: 'Please enter all required fields' });
     }
 
-    const sql = "INSERT INTO issued_fines (d_id, r_id, p_id, price, fine_status, date, payment_doubled) VALUES (?,?,?,?,?,?,?)";
+    // Define SQL query to insert fine data
+    const insertFineSql = "INSERT INTO issued_fines (d_id, r_id, p_id, price, fine_status, date, payment_doubled) VALUES (?,?,?,?,?,?,?)";
     const currentDate = new Date().toISOString().split('T')[0];
-    const values = [driverId, ruleId, policeId, finePrice, 'pending', currentDate, 'no'];
+    const fineValues = [driverId, ruleId, policeId, finePrice, 'pending', currentDate, 'no'];
 
-    pool.query(sql, values, (err, result) => {
-        if(err) {
+    // Insert fine data into the database
+    pool.query(insertFineSql, fineValues, (err, result) => {
+        if (err) {
             console.log(err);
-            return res.status(500).json({message: 'Internal server error'});
+            return res.status(500).json({ message: 'Internal server error' });
         }
+
         console.log('Fine issued successfully');
-        return res.status(200).json({message: 'Fine issued successfully'});
+
+        // Define SQL query to insert notification data
+        const insertNotificationSql = "INSERT INTO notifications (d_id, noti_data, date_time) VALUES (?,?,?)";
+        const notificationMessage = `You have been fined ${finePrice} for violating rule ${ruleId}`;
+        const notificationValues = [driverId, notificationMessage, currentDate];
+
+        // Insert notification data into the database
+        pool.query(insertNotificationSql, notificationValues, (err, result) => {
+            if (err) {
+                console.log(err);
+                return res.status(500).json({ message: 'Internal server error' });
+            }
+
+            console.log('Notification sent successfully');
+            return res.status(200).json({ message: 'Fine issued successfully with Notification' });
+        });
     });
 });
+
 
 
 // Get Police by User ID
@@ -737,8 +795,25 @@ app.get('/api/getfine', (req, res) => {
             console.log(data)
             return res.json(data)
         }
-    })
-})
+    });
+});
+
+
+// Get All Fines According to Police ID
+app.get('/api/fines/police/:id', (req, res) => {
+    const sql = "SELECT * FROM issued_fines WHERE p_id = ?";
+    const values = [req.params.id];
+
+    pool.query(sql, values, (err, data) => {
+        if (err) {
+            // Handle error
+            console.log('Error executing query:', err);
+            return res.status(500).json({ message: 'Database error' });
+        }
+        console.log('Fines:', data);
+        return res.json(data);
+    });
+});
 
 // //generate qr code
 // app.post('/api/qr', (req, res) => {
@@ -794,10 +869,10 @@ app.post('/api/verifyotp', (req, res) => {
             console.log("User data:", data);
             if (data.length > 0 && parseInt(data[0].otp) === parseInt(otp)) {
                 console.log('Correct OTP');
-                return res.json('Correct OTP');
+                return res.status(200).json({ message: 'Correct OTP.' });
             } else {
                 console.log('Wrong OTP or user not found');
-                return res.json('Wrong OTP or user not found');
+                return res.status(401).json({ message: 'Incorrect OTP.' });
             }
         }
     });
